@@ -69,7 +69,7 @@ def get_pdf_link_selenium(paper_url):
         driver.quit()
 
 def FindBySearchQuery(SearchQuery):
-    ID_URL = f"https://api.semanticscholar.org/graph/v1/paper/search?query={SearchQuery}&fields=url,abstract&limit=5"
+    ID_URL = f"https://api.semanticscholar.org/graph/v1/paper/search?query={SearchQuery}&fields=url,abstract&limit=10"
 
     headers = {"x-api-key": SEMANTIC_API_KEY}
     response = requests.get(ID_URL, headers=headers)
@@ -80,11 +80,12 @@ def FindBySearchQuery(SearchQuery):
     for paper in papers:
         open_access_pdf = paper.get('openAccessPdf')
         if not open_access_pdf['url']:
-            paper_url = paper.get('url')
-            pdf_link = get_pdf_link_selenium(paper_url)
-            if not pdf_link:
-                #권한 문제 있는 논문이라고 url과 함께 저장하면 됨
-                pass
+            pass
+            # paper_url = paper.get('url')
+            # pdf_link = get_pdf_link_selenium(paper_url)
+            # if not pdf_link:
+            #     #권한 문제 있는 논문이라고 url과 함께 저장하면 됨
+            #     pass
         else:
             end.append(paper)
     return end
