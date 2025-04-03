@@ -33,13 +33,10 @@ def KeywordAndTranslate(query, client):
         temperature=0.6,
     )
 
-    print(response.choices[0].message.content)
+    # print(response.choices[0].message.content)
 
     search_Query = response.choices[0].message.content.split('Search Query**: ')[-1].split('\n')[0].strip()
     user_Request = response.choices[0].message.content.split('Search Query**: ')[-1].split('User Request**: ')[-1]
-
-    print('Search Query :', search_Query)
-    print('User Request :', user_Request)
 
     return search_Query, user_Request
 

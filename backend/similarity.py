@@ -24,7 +24,7 @@ def SetData(json_Data):
 
     return results
 
-def CheckSimilarity(json_Data):
+def CheckSimilarity(search_Query, json_Data):
     # ✅ 데이터 (title + abstract 결합)
     documents = [
         Document(
@@ -47,7 +47,7 @@ def CheckSimilarity(json_Data):
     # ✅ 압축 검색기 (Reranker 적용)
     compression_retriever = ContextualCompressionRetriever(base_compressor=compressor, base_retriever=retriever)
 
-    compressed_docs = compression_retriever.invoke('AI ethics')
+    compressed_docs = compression_retriever.invoke(search_Query)
 
     return compressed_docs
 
