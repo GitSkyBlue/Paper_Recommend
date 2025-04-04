@@ -74,6 +74,9 @@ def FindBySearchQuery(SearchQuery, selected_field):
     # print(response)
     data = response.json()
     
+    print('*'*90)
+    print(data)
+
     end = []
     papers = data.get('data', [])
     for paper in papers:
@@ -105,6 +108,28 @@ def FindBySearchQuery(SearchQuery, selected_field):
                 end.append(paper)
 
     return end
+
+def ClassifyIntentGPT(client, user_more_input):
+    prompt = f"""
+    Based on the user's input, classify the intent of the user into one of the categories:
+    - "search" (if the user is asking to find relevant research papers)
+    - "more_analysis" (if the user wants deeper insights or further analysis on a previously selected paper)
+    
+    Intent:
+    """
+    response = client.chat.completions.create(
+            messages=[
+                {'role': 'system', 'content': prompt},
+                {'role': 'user', 'content': user_more_input}
+            ],
+            model='gpt-4o-mini',
+            max_tokens=1024,
+            temperature=0.6,
+        )
+    print('k'*100)
+    print(response.choices[0].message.content.split(' ')[-1])
+    return response.choices[0].message.content.split(' ')[-1]
+
 
 if __name__ == '__main__':
     client = OpenAI()

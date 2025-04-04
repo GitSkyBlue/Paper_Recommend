@@ -7,6 +7,7 @@ import os
 from openai import OpenAI
 import backend.similarity
 import backend.summary
+import re
 
 load_dotenv()
 
@@ -158,13 +159,49 @@ if st.session_state["step"] == 3:
     answer = backend.summary.Summarize(client, user_request)
 
     for title, summary in answer:
-        print(title, '-'*90)
-        print(summary, '-'*90)
-        print(selected_paper[1])
-        if selected_paper[1] == title.replace('.pdf', ''):
+        selection = re.sub(r'[<>:"/\\|?*]', '', selected_paper[1])  # 파일명 정리
+        if selection == title.replace('.pdf', ''):
+            print('k'*100)
+            print(title.replace('.pdf', ''))
+            print(summary)
+            print(selected_paper[1])
             st.session_state["chat_history"].append(("user", f"📄 선택한 논문: **{title}**"))
             st.session_state["chat_history"].append(("bot", f"📝 논문 주요 내용 요약: {summary}"))
             st.session_state["chat_history"].append(("bot", "✅ AI가 추천하는 연구 방향:\n- 이 논문의 방법론을 실제 데이터셋에 적용해보세요.\n- 최신 트렌드와 비교 분석하여 더 나은 모델을 찾아보세요."))
+            st.session_state['title'] = title
+            st.session_state["step"] = 4  # 다시 질문을 받도록 초기화
+            st.rerun()
 
-            st.session_state["step"] = 0  # 다시 질문을 받도록 초기화
+if st.session_state['step'] == 4:
+    st.subheader("💬 추가 질문을 기다리는 중...")
+    
+    user_more_input = st.chat_input("추가 질문을 입력하세요.")
+
+    if user_more_input:
+        st.session_state["chat_history"].append(("user", user_more_input))
+        
+        # 의도 분류 (가정: backend.intent라는 모듈에 ClassifyIntent 함수 존재)
+        intent = backend.search.ClassifyIntentGPT(client, user_more_input)
+        
+        if intent == "search":  # 검색 의도
+            st.session_state["chat_history"].append(("bot", "🔎 새로운 논문 검색 요청으로 인식했습니다. 검색을 시작합니다..."))
+            st.session_state["step"] = 1  # 논문 추천 단계로 이동
+            st.session_state["first_question"] = False
+            
+            # 백엔드 검색 로직 재사용
+            SearchQuery, user_request = backend.search.KeywordAndTranslate(user_more_input, client)
+            json_Data = backend.search.FindBySearchQuery(SearchQuery, st.session_state["selected_field"])
+            st.session_state["SearchQuery"] = SearchQuery
+            st.session_state["user_request"] = user_request
+            st.session_state["json_Data"] = json_Data
+            st.rerun()
+        
+        elif intent == "more_analysis":  # 추가 분석 요구
+            st.session_state["chat_history"].append(("bot", "📑 논문에 대한 추가 분석 요청으로 인식했습니다. 처리 중..."))
+            title = st.session_state['title']
+
+            #사용자 쿼리를 바탕으로 논문 pdf 읽어서 분석하고 출력하는 함수
+            additional_summary = backend.summary.AdditionalAnalysis(client, user_more_input, title)
+            st.session_state["chat_history"].append(("bot", f"📝 추가 분석 결과: {additional_summary}"))
+            st.session_state["step"] = 4  # Step 4 유지 (추가 질문 대기)
             st.rerun()

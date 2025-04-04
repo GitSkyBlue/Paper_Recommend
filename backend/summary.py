@@ -189,7 +189,27 @@ def Summarize(client, user_request):
         final.append([file, response.choices[0].message.content])
     
     return final
-        
+
+def AdditionalAnalysis(client, user_more_input, title):
+    doc = fitz.open('./downloads/' + title)
+    text = "\n".join([page.get_text("text") for page in doc])
+    
+    response = client.chat.completions.create(
+        messages=[
+                {'role': 'system', 'content': f"""
+                You are an AI research assistant that processes academic papers based on specific user requests.  
+                Your primary task is to analyze the given research paper and provide an accurate response according to the user's request.  
+                The final response should be translated into Korean before being presented to the user.
+                Based on {text}, generate best answer about user's input.
+                """},
+                {'role': 'user', 'content': user_more_input}
+            ],
+            model='gpt-4o-mini',
+            max_tokens=1024,
+            temperature=0.6,
+    )
+
+    return response.choices[0].message.content
 
 if __name__ == '__main__':
     Summarize(OpenAI())
