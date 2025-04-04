@@ -11,6 +11,7 @@ if __name__ == '__main__':
     print('User Request :', user_Request)
 
     json_Data = search.FindBySearchQuery(search_Query)
+    ###################################################
 
     results = similarity.SetData(json_Data)
 
