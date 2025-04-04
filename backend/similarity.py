@@ -26,31 +26,34 @@ def SetData(json_Data):
 
 def CheckSimilarity(search_Query, json_Data):
     # ✅ 데이터 (title + abstract 결합)
-    documents = [
-        Document(
-            page_content=f"{item['title']}\n\n{item['abstract'] or ''}", 
-            metadata={"paperId": item["paperId"], "title": item["title"]}
-        )
-        for item in json_Data
-    ]
+    try:
+        documents = [
+            Document(
+                page_content=f"{item['title']}\n\n{item['abstract'] or ''}", 
+                metadata={"paperId": item["paperId"], "title": item["title"]}
+            )
+            for item in json_Data
+        ]
 
-    # ✅ 임베딩 모델
-    embeddingsModel = HuggingFaceEmbeddings(model_name='sentence-transformers/msmarco-distilbert-dot-v5')
+        # ✅ 임베딩 모델
+        embeddingsModel = HuggingFaceEmbeddings(model_name='sentence-transformers/msmarco-distilbert-dot-v5')
 
-    # ✅ FAISS 인덱스 생성
-    retriever = FAISS.from_documents(documents, embeddingsModel).as_retriever(search_kwargs={'k': 7})
+        # ✅ FAISS 인덱스 생성
+        retriever = FAISS.from_documents(documents, embeddingsModel).as_retriever(search_kwargs={'k': 7})
 
-    # ✅ Reranker 모델
-    model = HuggingFaceCrossEncoder(model_name='BAAI/bge-reranker-v2-m3')
-    compressor = CrossEncoderReranker(model=model, top_n=3)
+        # ✅ Reranker 모델
+        model = HuggingFaceCrossEncoder(model_name='BAAI/bge-reranker-v2-m3')
+        compressor = CrossEncoderReranker(model=model, top_n=3)
 
-    # ✅ 압축 검색기 (Reranker 적용)
-    compression_retriever = ContextualCompressionRetriever(base_compressor=compressor, base_retriever=retriever)
+        # ✅ 압축 검색기 (Reranker 적용)
+        compression_retriever = ContextualCompressionRetriever(base_compressor=compressor, base_retriever=retriever)
 
-    compressed_docs = compression_retriever.invoke(search_Query)
+        compressed_docs = compression_retriever.invoke(search_Query)
 
-    return compressed_docs
-
+        return compressed_docs
+    except:
+        print('qwer')
+        
 if __name__ == '__main__':
     client = OpenAI()
     query = 'Attention is all you need에 대해서 알고싶어요'

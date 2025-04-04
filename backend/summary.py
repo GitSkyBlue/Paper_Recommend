@@ -6,9 +6,11 @@ import fitz
 import glob
 from openai import OpenAI
 import certifi
+import re
 
 os.environ["CURL_CA_BUNDLE"] = ""
 os.environ["SSL_CERT_FILE"] = certifi.where()
+
 def FindIDAndURL(sim_list, json_Data):
     paper_info = []
     print(sim_list)
@@ -23,16 +25,29 @@ def FindIDAndURL(sim_list, json_Data):
 
     return paper_info
 
+def wait_for_downloads(download_dir, timeout=60):
+    """ 다운로드가 완료될 때까지 대기 """
+    start_time = time.time()
+    while True:
+        time.sleep(1)  # 1초마다 체크
+        downloading_files = glob.glob(os.path.join(download_dir, "*.crdownload"))  # 아직 다운로드 중인 파일 확인
+        if not downloading_files:  # 다운로드 중인 파일이 없으면 종료
+            break
+        if time.time() - start_time > timeout:  # 최대 대기 시간 초과 시 종료
+            print("⚠ 다운로드 대기 시간 초과!")
+            break
+
 def DownloadPDF(paper_infos):
     download_dir = os.path.abspath("downloads")  # 현재 폴더 내 'downloads' 폴더에 저장
+    os.makedirs(download_dir, exist_ok=True)  # ✅ 폴더 없으면 생성
 
     # 🔧 Chrome 옵션 설정
     chrome_options = Options()
     chrome_options.add_experimental_option("prefs", {
-        "download.default_directory": download_dir,  # 다운로드 경로 설정
-        "download.prompt_for_download": False,  # 다운로드 창 비활성화
-        "download.directory_upgrade": True,  # 기존 설정 유지
-        "plugins.always_open_pdf_externally": True  # PDF 뷰어 대신 다운로드
+        "download.default_directory": download_dir,
+        "download.prompt_for_download": False,
+        "download.directory_upgrade": True,
+        "plugins.always_open_pdf_externally": True
     })
 
     # 🌐 Chrome 드라이버 실행
@@ -40,27 +55,33 @@ def DownloadPDF(paper_infos):
 
     for data in paper_infos:
         pdf_url = data[2]
-        paper_id = data[1]  # paperId 가져오기
+        paper_id = re.sub(r'[<>:"/\\|?*]', '', data[1])  # 파일명 정리
 
         # 🚀 페이지 이동 (다운로드 자동 시작)
         driver.get(pdf_url)
 
-        # ⏳ 다운로드 대기 (파일 다운로드 시간 확보)
-        time.sleep(7)
+        # ⏳ 다운로드 완료 대기
+        wait_for_downloads(download_dir)
 
-        # 🔍 최신 다운로드된 파일 찾기
-        downloaded_files = glob.glob(os.path.join(download_dir, "*.pdf"))  # downloads 폴더 내 PDF 파일 목록 가져오기
-        if downloaded_files:
-            latest_file = max(downloaded_files, key=os.path.getctime)  # 가장 최근에 생성된 파일 찾기
-            new_file_path = os.path.join(download_dir, f"{paper_id}.pdf")  # 새 파일명 설정
+        # 🔍 최신 다운로드된 파일 찾기 (다시 검색)
+        time.sleep(2)  # 추가 대기 (파일 시스템 처리 시간 확보)
+        downloaded_files = glob.glob(os.path.join(download_dir, "*.pdf"))
+        if not downloaded_files:
+            print(f"⚠ {paper_id}.pdf 파일을 찾을 수 없음!")
+            continue  # 다음 파일로 이동
 
-            # 📝 파일명 변경
+        latest_file = max(downloaded_files, key=os.path.getctime)
+        new_file_path = os.path.join(download_dir, f"{paper_id}.pdf")  # 새 파일명 설정
+
+        # 📝 파일명 변경 (이미 존재하는 경우 덮어쓰기 방지)
+        if latest_file != new_file_path:
             os.rename(latest_file, new_file_path)
             print(f"📂 {latest_file} → {new_file_path} 로 변경 완료!")
+        else:
+            print(f"✅ {new_file_path} 이름 변경 불필요 (이미 올바른 이름)")
 
     # 🚪 드라이버 종료
     driver.quit()
-
     print(f"✅ PDF 다운로드 완료: {download_dir}")
 
 def Summarize(client):
@@ -82,12 +103,13 @@ def Summarize(client):
                 {'role': 'user', 'content': text}
             ],
             model='gpt-4o-mini',
-            max_tokens=100,
+            max_tokens=1024,
             temperature=0.6,
         )
 
+        print('FileName :', file)
+        print('='*90)
         print(file, '\n', response.choices[0].message.content)
 
 if __name__ == '__main__':
     Summarize(OpenAI())
-   

@@ -70,6 +70,7 @@ def FindBySearchQuery(SearchQuery):
 
     headers = {"x-api-key": SEMANTIC_API_KEY}
     response = requests.get(ID_URL, headers=headers)
+    # print(response)
     data = response.json()
     
     end = []
@@ -85,6 +86,7 @@ def FindBySearchQuery(SearchQuery):
             #     pass
         else:
             end.append(paper)
+
     return end
 
 if __name__ == '__main__':

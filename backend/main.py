@@ -10,24 +10,13 @@ if __name__ == '__main__':
     print('Search Query :', search_Query)
     print('User Request :', user_Request)
 
-    result = search.FindBySearchQuery(search_Query)
-    # print('=='* 80)
-    # print(result)
-    # print('=='* 80)
-
     json_Data = search.FindBySearchQuery(search_Query)
-    # print('=='* 80)
-    # print(json_Data)
-    # print('=='* 80)
+
     results = similarity.SetData(json_Data)
 
     sim_list = similarity.CheckSimilarity(search_Query, results)
-    # for data in sim_list:
-    #     print(data.page_content)
 
-    # print('여기에요' * 100)
-    # print(sim_list)
-    paper_infos = summary.FindIDAndURL(sim_list, result)
+    paper_infos = summary.FindIDAndURL(sim_list, json_Data)
     print(paper_infos)
     summary.DownloadPDF(paper_infos)
     summary.Summarize(client)
