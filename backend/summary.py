@@ -7,11 +7,12 @@ import glob
 from openai import OpenAI
 import certifi
 import re
+import shutil
 
 os.environ["CURL_CA_BUNDLE"] = ""
 os.environ["SSL_CERT_FILE"] = certifi.where()
 
-def FindIDAndURL(sim_list, json_Data):
+def FindIDAndURL(sim_list, json_Data, client):
     paper_info = []
     print(sim_list)
     for sim_text in sim_list:
@@ -23,6 +24,26 @@ def FindIDAndURL(sim_list, json_Data):
                 paper_info.append([data['paperId'], data['title'], data['openAccessPdf']['url'], data.get('abstract', 'No abstract available')])
                 break  # 일치하는 논문을 찾았으면 더 이상 탐색할 필요 없음
 
+    for i, (id, title, pdf, abstract) in enumerate(paper_info):
+        response = client.chat.completions.create(
+                    messages=[
+                        {'role': 'system', 'content': '''
+                        You are an AI assistant that summarizes and translates research abstracts concisely and accurately.  \
+                        Follow these steps:  
+                        1. Summarize the abstract in **three sentences**:  
+                        - The research problem and significance.  
+                        - The main approach/methodology.  
+                        - The key findings and implications.  
+                        2. Translate the summary into Korean. 
+                        3. From your answer, only give translated answer. Do not give English summary of the abstract.
+                        '''},
+                        {'role': 'user', 'content': abstract}
+                    ],
+                    model='gpt-4o-mini',
+                    max_tokens=1024,
+                    temperature=0.6,
+                )
+        paper_info[i].append(response.choices[0].message.content)
     return paper_info
 
 def wait_for_downloads(download_dir, timeout=60):
@@ -39,6 +60,10 @@ def wait_for_downloads(download_dir, timeout=60):
 
 def DownloadPDF(paper_infos):
     download_dir = os.path.abspath("downloads")  # 현재 폴더 내 'downloads' 폴더에 저장
+
+    if os.path.exists(download_dir): #이전에 다운로드 받은 파일/폴더 있으면 자동 삭제제
+        shutil.rmtree(download_dir)
+
     os.makedirs(download_dir, exist_ok=True)  # ✅ 폴더 없으면 생성
 
     # 🔧 Chrome 옵션 설정
@@ -84,22 +109,57 @@ def DownloadPDF(paper_infos):
     driver.quit()
     print(f"✅ PDF 다운로드 완료: {download_dir}")
 
-def Summarize(client):
+def Summarize(client, user_request):
     path = 'downloads/'
     file_list = os.listdir(path=path)
+
+    final = []
 
     for file in file_list:
         doc = fitz.open('./downloads/' + file)
         text = "\n".join([page.get_text("text") for page in doc])
 
+        if "summary" in user_request.lower() or "summarize" in user_request.lower():
+            system_prompt = '''
+            You are an AI research assistant that summarizes academic papers into well-structured Korean summaries.
+
+            📌 Instructions:
+            1. Consider everything between "Introduction" and "Conclusion" as the main content.
+            2. Summarize the **Introduction** - briefly state the background and the research question.
+            3. Summarize the **Main Content** - focus on methodology, experiments, and key findings in a concise but informative way.
+            4. Summarize the **Conclusion** - highlight the achievements and possible future directions.
+            5. Format the response with clear headings for each section.
+            6. Translate the final response into fluent Korean.
+            '''
+        else:
+            system_prompt = f'''
+            You are an AI research assistant that processes academic papers based on specific user requests.  
+            Your primary task is to analyze the given research paper and provide an accurate response according to the user's request.  
+            The final response should be translated into Korean before being presented to the user.  
+
+            📌 **Instructions:**  
+            1️. **Understand the user's request `{user_request}`.**  
+            - Identify whether the user wants a summary, formula extraction, reference list, methodology analysis, experimental results, dataset details, or another specific request.  
+            - If the request is unclear, summarize the key aspects of the paper and prompt the user for further clarification.  
+            - If the request is highly unusual, break it down logically and extract the most relevant information.  
+
+            2️. **Extract and provide ONLY the requested information.**  
+            - Summarize the paper **only if explicitly requested.**  
+            - Extract mathematical formulas **only when needed.**  
+            - List references **only when required.**  
+            - Explain methodologies **only if the user asks.**  
+            - Extract and analyze experimental results **only upon request.**  
+            - Identify datasets **only if explicitly asked.**  
+            - If the request does not match any of the above, infer the most relevant sections logically.  
+
+            3️. **Translate the final response into Korean.**  
+            - Ensure the original response is well-structured and clear.  
+            - Translate the response into fluent and natural Korean before presenting it to the user.  
+            - If multiple aspects are requested, separate each section accordingly.
+            '''
         response = client.chat.completions.create(
             messages=[
-                {'role': 'system', 'content': '''
-                1. Every contents between introduciton and conclusion is considered as 'main contents'.
-                2. Summarize the research paper's introduction
-                3. Summarize the research paper's main contents in a concise and informative way.
-                4. Summarize the research paper's conclusion. Focus on the research's achievements and future work.
-                '''},
+                {'role': 'system', 'content': system_prompt},
                 {'role': 'user', 'content': text}
             ],
             model='gpt-4o-mini',
@@ -110,6 +170,10 @@ def Summarize(client):
         print('FileName :', file)
         print('='*90)
         print(file, '\n', response.choices[0].message.content)
+        final.append([file, response.choices[0].message.content])
+    
+    return final
+        
 
 if __name__ == '__main__':
     Summarize(OpenAI())

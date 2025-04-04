@@ -4,7 +4,7 @@ from langchain.retrievers import ContextualCompressionRetriever
 from langchain.retrievers.document_compressors import CrossEncoderReranker
 from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 from langchain_huggingface import HuggingFaceEmbeddings
-import search
+
 from dotenv import load_dotenv
 import os
 from openai import OpenAI
@@ -49,22 +49,22 @@ def CheckSimilarity(search_Query, json_Data):
         compression_retriever = ContextualCompressionRetriever(base_compressor=compressor, base_retriever=retriever)
 
         compressed_docs = compression_retriever.invoke(search_Query)
-
+        print(compressed_docs)
         return compressed_docs
     except:
         print('qwer')
         
-if __name__ == '__main__':
-    client = OpenAI()
-    query = 'Attention is all you need에 대해서 알고싶어요'
+# if __name__ == '__main__':
+#     client = OpenAI()
+#     query = 'Attention is all you need에 대해서 알고싶어요'
 
-    search_Query, user_Request = search.KeywordAndTranslate(query, client)
-    print(search_Query, user_Request)
+#     search_Query, user_Request = search.KeywordAndTranslate(query, client)
+#     print(search_Query, user_Request)
 
-    json_Data = search.FindBySearchQuery(search_Query)
+#     json_Data = search.FindBySearchQuery(search_Query)
 
-    results = SetData(json_Data)
+#     results = SetData(json_Data)
 
-    sim = CheckSimilarity(results)
-    for data in sim:
-        print(data.page_content)
+#     sim = CheckSimilarity(results)
+#     for data in sim:
+#         print(data.page_content)

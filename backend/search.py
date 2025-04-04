@@ -22,9 +22,10 @@ def KeywordAndTranslate(query, client):
             {'role': 'system', 'content': '''
         You are an AI assistant that helps process academic research queries.
         Analyze the user's question and extract:
-        1. **Search Query**: Extract the **exact research topic or paper title**. DO NOT generate a new topic. If the user provides a paper title, return it exactly as given.
-        2. **User Request**: Identify any additional actions (e.g., summarizing, extracting equations, listing references).
-        3. never use korean
+        1. If user's query is written in Korean, translate it into English.
+        2. **Search Query**: Extract the **exact research topic or paper title**. DO NOT generate a new topic. If the user provides a paper title, return it exactly as given.
+        3. **User Request**: Identify any additional actions (e.g., summarizing, extracting equations, listing references).
+        3. Never use Korean.
             '''},
             {'role': 'user', 'content': query}
         ],
@@ -33,7 +34,7 @@ def KeywordAndTranslate(query, client):
         temperature=0.6,
     )
 
-    # print(response.choices[0].message.content)
+    print(response.choices[0].message.content)
 
     search_Query = response.choices[0].message.content.split('Search Query**: ')[-1].split('\n')[0].strip()
     user_Request = response.choices[0].message.content.split('Search Query**: ')[-1].split('User Request**: ')[-1]
@@ -65,8 +66,8 @@ def get_pdf_link_selenium(paper_url):
     finally:
         driver.quit()
 
-def FindBySearchQuery(SearchQuery):
-    ID_URL = f"https://api.semanticscholar.org/graph/v1/paper/search?query={SearchQuery}&fields=url,abstract&limit=10"
+def FindBySearchQuery(SearchQuery, selected_field):
+    ID_URL = f"https://api.semanticscholar.org/graph/v1/paper/search?query={SearchQuery}&fields=url,abstract,fieldsOfStudy&limit=10"
 
     headers = {"x-api-key": SEMANTIC_API_KEY}
     response = requests.get(ID_URL, headers=headers)
@@ -76,16 +77,32 @@ def FindBySearchQuery(SearchQuery):
     end = []
     papers = data.get('data', [])
     for paper in papers:
-        open_access_pdf = paper.get('openAccessPdf')
-        if not open_access_pdf['url']:
-            pass
-            # paper_url = paper.get('url')
-            # pdf_link = get_pdf_link_selenium(paper_url)
-            # if not pdf_link:
-            #     #권한 문제 있는 논문이라고 url과 함께 저장하면 됨
-            #     pass
-        else:
-            end.append(paper)
+        category = paper.get('fieldsOfStudy')
+
+        if type(category) == list:
+            if category[0] == selected_field:
+                open_access_pdf = paper.get('openAccessPdf')
+                if not open_access_pdf['url']:
+                    pass
+                    # paper_url = paper.get('url')
+                    # pdf_link = get_pdf_link_selenium(paper_url)
+                    # if not pdf_link:
+                    #     #권한 문제 있는 논문이라고 url과 함께 저장하면 됨
+                    #     pass
+                else:
+                    end.append(paper)
+
+        else: 
+            open_access_pdf = paper.get('openAccessPdf')
+            if not open_access_pdf['url']:
+                pass
+                # paper_url = paper.get('url')
+                # pdf_link = get_pdf_link_selenium(paper_url)
+                # if not pdf_link:
+                #     #권한 문제 있는 논문이라고 url과 함께 저장하면 됨
+                #     pass
+            else:
+                end.append(paper)
 
     return end
 
