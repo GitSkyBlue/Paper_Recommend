@@ -128,7 +128,8 @@ if st.session_state["step"] == 1:
 
     #제목+초록 가져오기
     paper_infos = backend.summary.FindIDAndURL(sim_list, json_Data, client)
-    backend.summary.DownloadPDF(paper_infos)
+    paper_infos = backend.summary.DownloadPDF(paper_infos)
+    print(paper_infos)
 
     paper_list = "\n\n".join([f"📄 {i+1}. {title}\n\n-{translate}\n\n{url}" for i, (id, title, url, abstract, translate) in enumerate(paper_infos)])
     st.session_state["papers"] = paper_infos

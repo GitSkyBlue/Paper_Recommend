@@ -67,7 +67,7 @@ def get_pdf_link_selenium(paper_url):
         driver.quit()
 
 def FindBySearchQuery(SearchQuery, selected_field):
-    ID_URL = f"https://api.semanticscholar.org/graph/v1/paper/search?query={SearchQuery}&fields=url,abstract,fieldsOfStudy&limit=10"
+    ID_URL = f"https://api.semanticscholar.org/graph/v1/paper/search?query={SearchQuery}&fields=url,abstract,fieldsOfStudy&limit=20"
 
     headers = {"x-api-key": SEMANTIC_API_KEY}
     response = requests.get(ID_URL, headers=headers)

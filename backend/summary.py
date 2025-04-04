@@ -75,39 +75,55 @@ def DownloadPDF(paper_infos):
         "plugins.always_open_pdf_externally": True
     })
 
-    # 🌐 Chrome 드라이버 실행
+    #Chrome 드라이버 실행
     driver = webdriver.Chrome(options=chrome_options)
 
-    for data in paper_infos:
+    successful_papers = []
+
+    for i, data in enumerate(paper_infos):
         pdf_url = data[2]
         paper_id = re.sub(r'[<>:"/\\|?*]', '', data[1])  # 파일명 정리
 
-        # 🚀 페이지 이동 (다운로드 자동 시작)
+        #다운로드 전 파일 목록 기록
+        before_files = set(glob.glob(os.path.join(download_dir, "*.pdf")))
+
+        #페이지 이동 (다운로드 자동 시작)
         driver.get(pdf_url)
 
-        # ⏳ 다운로드 완료 대기
+        #다운로드 완료 대기
         wait_for_downloads(download_dir)
-
-        # 🔍 최신 다운로드된 파일 찾기 (다시 검색)
         time.sleep(2)  # 추가 대기 (파일 시스템 처리 시간 확보)
-        downloaded_files = glob.glob(os.path.join(download_dir, "*.pdf"))
-        if not downloaded_files:
+
+        #다운로드 후 파일 목록 확인
+        after_files = set(glob.glob(os.path.join(download_dir, "*.pdf")))
+        new_files = list(after_files - before_files)
+
+        #최신 다운로드된 파일 찾기 (다시 검색)
+        if not new_files:
             print(f"⚠ {paper_id}.pdf 파일을 찾을 수 없음!")
             continue  # 다음 파일로 이동
 
-        latest_file = max(downloaded_files, key=os.path.getctime)
+        latest_file = max(new_files, key=os.path.getctime)
         new_file_path = os.path.join(download_dir, f"{paper_id}.pdf")  # 새 파일명 설정
 
         # 📝 파일명 변경 (이미 존재하는 경우 덮어쓰기 방지)
-        if latest_file != new_file_path:
-            os.rename(latest_file, new_file_path)
-            print(f"📂 {latest_file} → {new_file_path} 로 변경 완료!")
-        else:
-            print(f"✅ {new_file_path} 이름 변경 불필요 (이미 올바른 이름)")
+        try:
+            if latest_file != new_file_path:
+                os.rename(latest_file, new_file_path)
+                print(f"📂 {latest_file} → {new_file_path} 로 변경 완료!")
+            else:
+                print(f"✅ {new_file_path} 이름 변경 불필요 (이미 올바른 이름)")
 
-    # 🚪 드라이버 종료
-    driver.quit()
-    print(f"✅ PDF 다운로드 완료: {download_dir}")
+            successful_papers.append(data)  # ✅ 성공한 논문만 저장
+        except Exception as e:
+            print(f'{paper_id}.pdf 이름 변경 실패: {e}')
+
+        # 🚪 드라이버 종료
+        if len(successful_papers) == 3:
+            driver.quit()
+            print(f"✅ PDF 다운로드 완료: {download_dir}")
+            return successful_papers
+    return successful_papers
 
 def Summarize(client, user_request):
     path = 'downloads/'
@@ -119,7 +135,7 @@ def Summarize(client, user_request):
         doc = fitz.open('./downloads/' + file)
         text = "\n".join([page.get_text("text") for page in doc])
 
-        if "summary" in user_request.lower() or "summarize" in user_request.lower():
+        if "summary" in user_request.lower() or "summariz" in user_request.lower():
             system_prompt = '''
             You are an AI research assistant that summarizes academic papers into well-structured Korean summaries.
 
