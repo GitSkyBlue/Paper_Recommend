@@ -1,16 +1,8 @@
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
-
-class SummarizeRequest(BaseModel):
-    paper_id: str
-    user_request: str
+from typing import List, Optional, Dict
     
 class QueryInput(BaseModel):
     query: str
-
-class QueryOutput(BaseModel):
-    search_query: str
-    user_request: str
 
 class PaperSearchRequest(BaseModel):
     search_query: str
@@ -24,18 +16,6 @@ class PaperItem(BaseModel):
 class SimilarityRequest(BaseModel):
     search_query: str
     json_data: List[PaperItem]
-
-class PaperInfo(BaseModel):
-    paperId: str
-    title: str
-    url: str
-    abstract: str
-
-class Document(BaseModel):
-    id: str
-    metadata: Dict[str, Any]
-    page_content: str
-    type: str
 
 class SimText(BaseModel):
     page_content: str
@@ -58,3 +38,7 @@ class DownloadPDFRequest(BaseModel):
 class SummarizeRequest(BaseModel):
     user_request: str
     selected_paper: str
+
+class AdditionalAnalysisRequest(BaseModel):
+    user_more_input: str
+    title: str

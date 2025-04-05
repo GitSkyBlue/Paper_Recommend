@@ -1,13 +1,10 @@
 import streamlit as st
 import time
-import backend.search
 from dotenv import load_dotenv
 import certifi
 import os
 from openai import OpenAI
-import backend.similarity
-import backend.summary
-import re
+import requests
 
 load_dotenv()
 
@@ -87,7 +84,7 @@ if st.session_state["step"] == -1:
     
     if st.button("선택 완료"):
         st.session_state["selected_field"] = selected_field
-        st.session_state["chat_history"].append(("bot", f"✅ 선택한 분야: **{selected_field}**"))
+        st.session_state["chat_history"].append(("bot", f"✅ 선택한 분야 : {selected_field}"))
         st.session_state["step"] = 0  # 질문 입력 단계로 이동
         st.rerun()
 
@@ -107,10 +104,12 @@ if st.session_state["step"] == 0:
         # 🛠 selected_field를 세션 상태에서 가져오기
         selected_field = st.session_state.get("selected_field")
 
-        SearchQuery, user_request = backend.search.KeywordAndTranslate(user_input, client)
-        json_Data = backend.search.FindBySearchQuery(SearchQuery, selected_field)
-        st.session_state['SearchQuery'] = SearchQuery
-        st.session_state['user_request'] = user_request
+        search_Query, user_Request = requests.post("http://localhost:8000/QueryAndRequest", json={"query": user_input}).json()
+        
+        json_Data = requests.post("http://localhost:8000/FindBySearchQuery", json={"search_query": search_Query, "selected_field": selected_field}).json()
+        
+        st.session_state['SearchQuery'] = search_Query
+        st.session_state['user_request'] = user_Request
         st.session_state["json_Data"] = json_Data
         st.rerun()
 
@@ -121,22 +120,39 @@ if st.session_state["step"] == 1:
         
     #데이터 정제
     json_Data = st.session_state.get("json_Data", None)
-    results = backend.similarity.SetData(json_Data)
+    results = []
+
+    for data in json_Data:
+        temp = {}
+        temp['paperId'] = data['paperId']
+        temp['title'] = data['title']
+        temp['abstract'] = data['abstract']
+
+        results.append(temp)
 
     #유사도 비교
-    SearchQuery = st.session_state.get("SearchQuery", None)
-    sim_list = backend.similarity.CheckSimilarity(SearchQuery, results)
+    search_Query = st.session_state.get("SearchQuery", None)
+    sim_list = requests.post("http://localhost:8000/CheckSimilarity", json={'search_query': search_Query, 'json_data': results}).json()
 
     #제목+초록 가져오기
-    paper_infos = backend.summary.FindIDAndURL(sim_list, json_Data, client)
-    print('*'*100)
-    print(paper_infos)
-    print('*'*100)
-    paper_infos = backend.summary.DownloadPDF(paper_infos)
-    print(paper_infos)
+    paper_infos = requests.post("http://localhost:8000/FindIDAndURL", json={"sim_list": [{"page_content": doc["page_content"]} for doc in sim_list], "json_data": json_Data}).json()
+    
+    # 변환
+    formatted_papers = [
+        {
+            "paper_id": item[0],
+            "title": item[1],
+            "pdf_url": item[2],
+            "abstract": item[3],
+            "summary": item[4]
+        }
+        for item in paper_infos
+    ]
 
-    paper_list = "\n\n".join([f"📄 {i+1}. {title}\n\n-{translate}\n\n{url}" for i, (id, title, url, abstract, translate) in enumerate(paper_infos)])
-    st.session_state["papers"] = paper_infos
+    selected_paper_infos = requests.post("http://localhost:8000/DownloadPDF", json={'paper_infos': formatted_papers}).json()
+    
+    paper_list = "\n\n".join([f"📄 {i+1}. {paper_info['title']}\n\n-{paper_info['summary']}\n\n{paper_info['pdf_url']}" for i, paper_info in enumerate(selected_paper_infos)])
+    st.session_state["papers"] = selected_paper_infos
 
     st.session_state["chat_history"].append(("bot", f"다음 논문들을 추천드립니다.\n\n{paper_list}\n\n🔽 분석할 논문을 선택해주세요!"))
     st.session_state["step"] = 2  # 논문 선택 단계로 이동
@@ -157,23 +173,17 @@ elif st.session_state["step"] == 2:
 # 📌 3. 논문 분석 결과 출력 단계
 if st.session_state["step"] == 3:
     selected_paper = st.session_state["selected_paper"]
-    user_request = st.session_state['user_request']
+    user_Request = st.session_state['user_request']
     
-    answer = backend.summary.Summarize(client, user_request)
-
-    for title, summary in answer:
-        selection = re.sub(r'[<>:"/\\|?*]', '', selected_paper[1])  # 파일명 정리
-        if selection == title.replace('.pdf', ''):
-            print('k'*100)
-            print(title.replace('.pdf', ''))
-            print(summary)
-            print(selected_paper[1])
-            st.session_state["chat_history"].append(("user", f"📄 선택한 논문: **{title}**"))
-            st.session_state["chat_history"].append(("bot", f"📝 논문 주요 내용 요약: {summary}"))
-            st.session_state["chat_history"].append(("bot", "✅ AI가 추천하는 연구 방향:\n- 이 논문의 방법론을 실제 데이터셋에 적용해보세요.\n- 최신 트렌드와 비교 분석하여 더 나은 모델을 찾아보세요."))
-            st.session_state['title'] = title
-            st.session_state["step"] = 4  # 다시 질문을 받도록 초기화
-            st.rerun()
+    answer = requests.post("http://localhost:8000/Summarize", json={'user_request': user_Request, 'selected_paper': selected_paper['title']}).json()
+    
+    if answer:
+        st.session_state["chat_history"].append(("user", f"📄 선택한 논문: {answer['title']}"))
+        st.session_state["chat_history"].append(("bot", f"📝 논문 주요 내용 요약: {answer['summary']}"))
+        st.session_state["chat_history"].append(("bot", "✅ AI가 추천하는 연구 방향:\n- 이 논문의 방법론을 실제 데이터셋에 적용해보세요.\n- 최신 트렌드와 비교 분석하여 더 나은 모델을 찾아보세요."))
+        st.session_state['title'] = answer['title']
+        st.session_state["step"] = 4  # 다시 질문을 받도록 초기화
+        st.rerun()
 
 if st.session_state['step'] == 4:
     st.subheader("💬 추가 질문을 기다리는 중...")
@@ -183,28 +193,10 @@ if st.session_state['step'] == 4:
     if user_more_input:
         st.session_state["chat_history"].append(("user", user_more_input))
         
-        # 의도 분류 (가정: backend.intent라는 모듈에 ClassifyIntent 함수 존재)
-        intent = backend.search.ClassifyIntentGPT(client, user_more_input)
+        title = st.session_state['title']
         
-        if intent == "search":  # 검색 의도
-            st.session_state["chat_history"].append(("bot", "🔎 새로운 논문 검색 요청으로 인식했습니다. 검색을 시작합니다..."))
-            st.session_state["step"] = 1  # 논문 추천 단계로 이동
-            st.session_state["first_question"] = False
-            
-            # 백엔드 검색 로직 재사용
-            SearchQuery, user_request = backend.search.KeywordAndTranslate(user_more_input, client)
-            json_Data = backend.search.FindBySearchQuery(SearchQuery, st.session_state["selected_field"])
-            st.session_state["SearchQuery"] = SearchQuery
-            st.session_state["user_request"] = user_request
-            st.session_state["json_Data"] = json_Data
-            st.rerun()
+        additional_summary = requests.post("http://localhost:8000/AdditionalAnalysis", json={'user_more_input': user_more_input, 'title': title}).json()
         
-        elif intent == "more_analysis":  # 추가 분석 요구
-            st.session_state["chat_history"].append(("bot", "📑 논문에 대한 추가 분석 요청으로 인식했습니다. 처리 중..."))
-            title = st.session_state['title']
-
-            #사용자 쿼리를 바탕으로 논문 pdf 읽어서 분석하고 출력하는 함수
-            additional_summary = backend.summary.AdditionalAnalysis(client, user_more_input, title)
-            st.session_state["chat_history"].append(("bot", f"📝 추가 분석 결과: {additional_summary}"))
-            st.session_state["step"] = 4  # Step 4 유지 (추가 질문 대기)
-            st.rerun()
+        st.session_state["chat_history"].append(("bot", f"📝 {additional_summary}"))
+        st.session_state["step"] = 4  # Step 4 유지 (추가 질문 대기)
+        st.rerun()
