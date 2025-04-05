@@ -129,7 +129,6 @@ def summarize_papers(request: SummarizeRequest):
     path = 'downloads/'
     file_path = os.path.join(path, re.sub(r'[<>:"/\\|?*]', '', request.selected_paper)+'.pdf')
 
-    final = []
     # 파일 존재 확인
     if not os.path.exists(file_path):
         return {"error": f"📁 파일이 존재하지 않습니다: {request.selected_paper}"}

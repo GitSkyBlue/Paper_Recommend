@@ -1,0 +1,31 @@
+create table user_input
+(
+    input_text VARCHAR(200) NOT NULL,
+    phone_number VARCHAR(15) NOT NULL
+);
+
+CREATE TABLE summary_store (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(200),
+    message TEXT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE summary_store MODIFY message TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+
+select * from summary_store;
+
+drop table chat_history;
+
+CREATE TABLE chat_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    session_id VARCHAR(100),  -- 고유 세션 식별자 (UUID 추천)
+    role ENUM('user', 'bot'),
+    message TEXT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE chat_history MODIFY message TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+
+select * from chat_history;
+
+SHOW FULL COLUMNS FROM chat_history;

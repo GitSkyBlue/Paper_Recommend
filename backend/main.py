@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from . import search, similarity, summary
+from . import search, similarity, summary, db
 
 app = FastAPI()
 
@@ -15,3 +15,4 @@ app.add_middleware(
 app.include_router(search.router)
 app.include_router(similarity.router)
 app.include_router(summary.router)
+app.include_router(db.router)

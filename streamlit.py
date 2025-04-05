@@ -5,7 +5,12 @@ import certifi
 import os
 from openai import OpenAI
 import requests
+import uuid
 
+# 세션 ID 없으면 생성
+if "session_id" not in st.session_state:
+    st.session_state["session_id"] = str(uuid.uuid4())
+    
 load_dotenv()
 
 SEMANTIC_API_KEY = os.getenv('SEMANTIC_API_KEY')
@@ -84,7 +89,9 @@ if st.session_state["step"] == -1:
     
     if st.button("선택 완료"):
         st.session_state["selected_field"] = selected_field
-        st.session_state["chat_history"].append(("bot", f"✅ 선택한 분야 : {selected_field}"))
+        message = f"✅ 선택한 분야 : {selected_field}"
+        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "role": "bot", "message": message})
+        st.session_state["chat_history"].append(("bot", message))
         st.session_state["step"] = 0  # 질문 입력 단계로 이동
         st.rerun()
 
@@ -96,6 +103,7 @@ if st.session_state["step"] == 0:
     user_input = st.chat_input("질문을 입력하세요.")  # 입력창 길이 통일
 
     if user_input: #이게 쿼리
+        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "role": "user", "message": user_input})
         st.session_state["chat_history"].append(("user", user_input))
         st.session_state["step"] = 1  # 다음 단계로 진행
         st.session_state["first_question"] = False  # 첫 질문 이후로는 문구 숨김
@@ -154,7 +162,9 @@ if st.session_state["step"] == 1:
     paper_list = "\n\n".join([f"📄 {i+1}. {paper_info['title']}\n\n-{paper_info['summary']}\n\n{paper_info['pdf_url']}" for i, paper_info in enumerate(selected_paper_infos)])
     st.session_state["papers"] = selected_paper_infos
 
-    st.session_state["chat_history"].append(("bot", f"다음 논문들을 추천드립니다.\n\n{paper_list}\n\n🔽 분석할 논문을 선택해주세요!"))
+    message = f"다음 논문들을 추천드립니다.\n\n{paper_list}\n\n🔽 분석할 논문을 선택해주세요!"
+    requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "role": "bot", "message": message})
+    st.session_state["chat_history"].append(("bot", message))
     st.session_state["step"] = 2  # 논문 선택 단계로 이동
     st.rerun()
 
@@ -175,12 +185,20 @@ if st.session_state["step"] == 3:
     selected_paper = st.session_state["selected_paper"]
     user_Request = st.session_state['user_request']
     
-    answer = requests.post("http://localhost:8000/Summarize", json={'user_request': user_Request, 'selected_paper': selected_paper['title']}).json()
+    answer = requests.post("http://localhost:8000/CheckExist", json={'title': selected_paper['title']}).json()
+    if answer == 0:
+        answer = requests.post("http://localhost:8000/Summarize", json={'user_request': user_Request, 'selected_paper': selected_paper['title']}).json()
     
     if answer:
-        st.session_state["chat_history"].append(("user", f"📄 선택한 논문: {answer['title']}"))
-        st.session_state["chat_history"].append(("bot", f"📝 논문 주요 내용 요약: {answer['summary']}"))
-        st.session_state["chat_history"].append(("bot", "✅ AI가 추천하는 연구 방향:\n- 이 논문의 방법론을 실제 데이터셋에 적용해보세요.\n- 최신 트렌드와 비교 분석하여 더 나은 모델을 찾아보세요."))
+        message = f"📄 선택한 논문: {answer['title']}"
+        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "role": "user", "message": message})
+        st.session_state["chat_history"].append(("user", message))
+
+        message = f"📝 논문 주요 내용 요약: {answer['summary']}"
+        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "role": "bot", "message": message})
+        requests.post("http://localhost:8000/SaveSummary", json={"title": answer['title'], "summary": answer['summary']})
+        st.session_state["chat_history"].append(("bot", message))
+
         st.session_state['title'] = answer['title']
         st.session_state["step"] = 4  # 다시 질문을 받도록 초기화
         st.rerun()
@@ -191,12 +209,14 @@ if st.session_state['step'] == 4:
     user_more_input = st.chat_input("추가 질문을 입력하세요.")
 
     if user_more_input:
+        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "role": "user", "message": user_more_input})
         st.session_state["chat_history"].append(("user", user_more_input))
         
         title = st.session_state['title']
         
         additional_summary = requests.post("http://localhost:8000/AdditionalAnalysis", json={'user_more_input': user_more_input, 'title': title}).json()
         
+        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "role": "bot", "message": f"📝 {additional_summary}"})
         st.session_state["chat_history"].append(("bot", f"📝 {additional_summary}"))
         st.session_state["step"] = 4  # Step 4 유지 (추가 질문 대기)
         st.rerun()

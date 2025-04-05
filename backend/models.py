@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Literal
     
 class QueryInput(BaseModel):
     query: str
@@ -41,4 +41,16 @@ class SummarizeRequest(BaseModel):
 
 class AdditionalAnalysisRequest(BaseModel):
     user_more_input: str
+    title: str
+
+class ChatLog(BaseModel):
+    session_id: str
+    role: Literal["user", "bot"]
+    message: str
+
+class SummaryLog(BaseModel):
+    title: str
+    summary: str
+
+class CheckRequest(BaseModel):
     title: str
