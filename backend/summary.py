@@ -68,6 +68,7 @@ def DownloadPDF(paper_infos):
 
     # 🔧 Chrome 옵션 설정
     chrome_options = Options()
+    chrome_options.add_argument('--headless=new')
     chrome_options.add_experimental_option("prefs", {
         "download.default_directory": download_dir,
         "download.prompt_for_download": False,
