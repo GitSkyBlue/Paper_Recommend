@@ -129,6 +129,9 @@ if st.session_state["step"] == 1:
 
     #제목+초록 가져오기
     paper_infos = backend.summary.FindIDAndURL(sim_list, json_Data, client)
+    print('*'*100)
+    print(paper_infos)
+    print('*'*100)
     paper_infos = backend.summary.DownloadPDF(paper_infos)
     print(paper_infos)
 

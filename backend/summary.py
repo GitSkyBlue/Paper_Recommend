@@ -2,21 +2,23 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 import time
 import os
-import fitz
 import glob
 from openai import OpenAI
 import certifi
 import re
 import shutil
+from fastapi import APIRouter
+from .models import SummarizeRequest
+from openai import OpenAI
 
 os.environ["CURL_CA_BUNDLE"] = ""
 os.environ["SSL_CERT_FILE"] = certifi.where()
 
 def FindIDAndURL(sim_list, json_Data, client):
     paper_info = []
-    print(sim_list)
+    # print(sim_list)
     for sim_text in sim_list:
-        print(sim_text)
+        # print(sim_text)
         title = sim_text.page_content.split('\n')[0]  # sim_list에서 제목 추출
 
         for data in json_Data:
@@ -211,6 +213,179 @@ def AdditionalAnalysis(client, user_more_input, title):
     )
 
     return response.choices[0].message.content
+
+
+##############################
+# backend/find.py (또는 main.py에 포함)
+from fastapi import APIRouter
+from openai import OpenAI
+from .models import FindIDAndURLRequest, DownloadPDFRequest
+from fastapi import APIRouter
+import os, re, shutil, glob, time
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+import fitz  # PyMuPDF
+
+router = APIRouter()
+
+client = OpenAI()  # 환경변수 OPENAI_API_KEY 필요
+
+@router.post("/FindIDAndURL")
+def find_id_and_url(request: FindIDAndURLRequest):
+    sim_list = request.sim_list
+    json_Data = request.json_data
+    paper_info = []
+
+    for sim_text in sim_list:
+        title = sim_text.page_content.split('\n')[0]
+        for data in json_Data:
+            if data['title'] == title:
+                paper_info.append([
+                    data['paperId'],
+                    data['title'],
+                    data['openAccessPdf']['url'],
+                    data.get('abstract', 'No abstract available')
+                ])
+                break
+
+    for i, (id, title, pdf, abstract) in enumerate(paper_info):
+        response = client.chat.completions.create(
+            messages=[
+                {'role': 'system', 'content': '''
+                    You are an AI assistant that summarizes and translates research abstracts concisely and accurately.  
+                    Follow these steps:  
+                    1. Summarize the abstract in **three sentences**:  
+                    - The research problem and significance.  
+                    - The main approach/methodology.  
+                    - The key findings and implications.  
+                    2. Translate the summary into Korean. 
+                    3. From your answer, only give translated answer. Do not give English summary of the abstract.
+                '''},
+                {'role': 'user', 'content': abstract}
+            ],
+            model='gpt-4o-mini',
+            max_tokens=1024,
+            temperature=0.6,
+        )
+        paper_info[i].append(response.choices[0].message.content)
+
+    return paper_info
+
+@router.post("/DownloadPDF")
+def download_pdf(request: DownloadPDFRequest):
+    paper_infos = request.paper_infos
+    download_dir = os.path.abspath("downloads")
+
+    if os.path.exists(download_dir):
+        shutil.rmtree(download_dir)
+    os.makedirs(download_dir, exist_ok=True)
+
+    chrome_options = Options()
+    chrome_options.add_argument('--headless=new')
+    chrome_options.add_experimental_option("prefs", {
+        "download.default_directory": download_dir,
+        "download.prompt_for_download": False,
+        "download.directory_upgrade": True,
+        "plugins.always_open_pdf_externally": True
+    })
+
+    driver = webdriver.Chrome(options=chrome_options)
+    successful_papers = []
+
+    for data in paper_infos:
+        pdf_url = data.pdf_url
+        paper_id = re.sub(r'[<>:"/\\|?*]', '', data.title)
+
+        before_files = set(glob.glob(os.path.join(download_dir, "*.pdf")))
+        driver.get(pdf_url)
+        wait_for_downloads(download_dir)
+        time.sleep(2)
+
+        after_files = set(glob.glob(os.path.join(download_dir, "*.pdf")))
+        new_files = list(after_files - before_files)
+
+        if not new_files:
+            print(f"⚠ {paper_id}.pdf 파일을 찾을 수 없음!")
+            continue
+
+        latest_file = max(new_files, key=os.path.getctime)
+        new_file_path = os.path.join(download_dir, f"{paper_id}.pdf")
+
+        try:
+            if latest_file != new_file_path:
+                os.rename(latest_file, new_file_path)
+                print(f"📂 {latest_file} → {new_file_path} 로 변경 완료!")
+            else:
+                print(f"✅ {new_file_path} 이름 변경 불필요")
+
+            successful_papers.append(data)
+        except Exception as e:
+            print(f'{paper_id}.pdf 이름 변경 실패: {e}')
+
+        if len(successful_papers) == 3:
+            break
+
+    driver.quit()
+    print(f"✅ PDF 다운로드 완료: {download_dir}")
+    return [paper.dict() for paper in successful_papers]
+
+@router.post("/summarize")
+def summarize_papers(request: SummarizeRequest):
+    path = 'downloads/'
+    file_path = os.path.join(path, request.selected_paper)
+
+    final = []
+
+    # 파일 존재 확인
+    if not os.path.exists(file_path):
+        return {"error": f"📁 파일이 존재하지 않습니다: {request.selected_paper}"}
+
+    # PDF 열기
+    doc = fitz.open(file_path)
+    text = "\n".join([page.get_text("text") for page in doc])
+
+    # 시스템 프롬프트 구성
+    if "summary" in request.user_request.lower() or "summariz" in request.user_request.lower():
+        system_prompt = '''
+        You are an AI research assistant that summarizes academic papers into well-structured Korean summaries.
+
+        📌 Instructions:
+        1. Consider everything between "Introduction" and "Conclusion" as the main content.
+        2. Summarize the **Introduction** - briefly state the background and the research question.
+        3. Summarize the **Main Content** - focus on methodology, experiments, and key findings in a concise but informative way.
+        4. Summarize the **Conclusion** - highlight the achievements and possible future directions.
+        5. Format the response with clear headings for each section.
+        6. Translate the final response into fluent Korean.
+        '''
+    else:
+        system_prompt = f'''
+        You are an AI research assistant that processes academic papers based on specific user requests.  
+        Your primary task is to analyze the given research paper and provide an accurate response according to the user's request.  
+        The final response should be translated into Korean before being presented to the user.  
+
+        📌 **Instructions:**  
+        1️. **Understand the user's request `{request.user_request}`.**  
+        2️. **Extract and provide ONLY the requested information.**  
+        3️. **Translate the final response into Korean.**  
+        '''
+
+    # GPT 호출
+    response = client.chat.completions.create(
+        messages=[
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': text}
+        ],
+        model='gpt-4o-mini',
+        max_tokens=1024,
+        temperature=0.6,
+    )
+
+    final.append({
+        "file_name": request.selected_paper,
+        "summary": response.choices[0].message.content
+    })
+
+    return final
 
 if __name__ == '__main__':
     Summarize(OpenAI())
