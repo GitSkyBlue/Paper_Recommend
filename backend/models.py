@@ -45,6 +45,7 @@ class AdditionalAnalysisRequest(BaseModel):
 
 class ChatLog(BaseModel):
     session_id: str
+    username: str
     role: Literal["user", "bot"]
     message: str
 

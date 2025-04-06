@@ -7,6 +7,8 @@ from openai import OpenAI
 import requests
 import uuid
 
+
+username = 'sky'
 # 세션 ID 없으면 생성
 if "session_id" not in st.session_state:
     st.session_state["session_id"] = str(uuid.uuid4())
@@ -50,6 +52,16 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# 👤 접속자 이름 우측 상단 표시
+st.markdown(
+    f"""
+    <div style='text-align: right; font-size: 20px; margin-bottom: -20px; color: gray;'>
+        접속자 : <b>{username}</b>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 # 🎯 세션 상태 초기화
 if "chat_history" not in st.session_state:
     st.session_state["chat_history"] = []
@@ -90,7 +102,7 @@ if st.session_state["step"] == -1:
     if st.button("선택 완료"):
         st.session_state["selected_field"] = selected_field
         message = f"✅ 선택한 분야 : {selected_field}"
-        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "role": "bot", "message": message})
+        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "bot", "message": message})
         st.session_state["chat_history"].append(("bot", message))
         st.session_state["step"] = 0  # 질문 입력 단계로 이동
         st.rerun()
@@ -103,7 +115,7 @@ if st.session_state["step"] == 0:
     user_input = st.chat_input("질문을 입력하세요.")  # 입력창 길이 통일
 
     if user_input: #이게 쿼리
-        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "role": "user", "message": user_input})
+        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "user", "message": user_input})
         st.session_state["chat_history"].append(("user", user_input))
         st.session_state["step"] = 1  # 다음 단계로 진행
         st.session_state["first_question"] = False  # 첫 질문 이후로는 문구 숨김
@@ -163,7 +175,7 @@ if st.session_state["step"] == 1:
     st.session_state["papers"] = selected_paper_infos
 
     message = f"다음 논문들을 추천드립니다.\n\n{paper_list}\n\n🔽 분석할 논문을 선택해주세요!"
-    requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "role": "bot", "message": message})
+    requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "bot", "message": message})
     st.session_state["chat_history"].append(("bot", message))
     st.session_state["step"] = 2  # 논문 선택 단계로 이동
     st.rerun()
@@ -191,11 +203,11 @@ if st.session_state["step"] == 3:
     
     if answer:
         message = f"📄 선택한 논문: {answer['title']}"
-        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "role": "user", "message": message})
+        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "user", "message": message})
         st.session_state["chat_history"].append(("user", message))
 
         message = f"📝 논문 주요 내용 요약: {answer['summary']}"
-        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "role": "bot", "message": message})
+        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "bot", "message": message})
         requests.post("http://localhost:8000/SaveSummary", json={"title": answer['title'], "summary": answer['summary']})
         st.session_state["chat_history"].append(("bot", message))
 
@@ -209,14 +221,14 @@ if st.session_state['step'] == 4:
     user_more_input = st.chat_input("추가 질문을 입력하세요.")
 
     if user_more_input:
-        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "role": "user", "message": user_more_input})
+        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "user", "message": user_more_input})
         st.session_state["chat_history"].append(("user", user_more_input))
         
         title = st.session_state['title']
         
         additional_summary = requests.post("http://localhost:8000/AdditionalAnalysis", json={'user_more_input': user_more_input, 'title': title}).json()
         
-        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "role": "bot", "message": f"📝 {additional_summary}"})
+        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "bot", "message": f"📝 {additional_summary}"})
         st.session_state["chat_history"].append(("bot", f"📝 {additional_summary}"))
         st.session_state["step"] = 4  # Step 4 유지 (추가 질문 대기)
         st.rerun()

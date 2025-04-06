@@ -18,8 +18,8 @@ def save_chat(log: ChatLog):
     conn = connect_to_mysql()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO chat_history (session_id, role, message) VALUES (%s, %s, %s)",
-        (log.session_id, log.role, log.message)
+        "INSERT INTO chat_history (session_id, username, role, message) VALUES (%s, %s, %s, %s)",
+        (log.session_id, log.username, log.role, log.message)
     )
     conn.commit()
     cursor.close()
@@ -51,7 +51,7 @@ def check_exist(request: CheckRequest):
     
     cursor.close()
     conn.close()
-    
+
     if results == None:
         return 0
     
