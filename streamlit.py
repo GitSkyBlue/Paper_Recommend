@@ -7,11 +7,7 @@ from openai import OpenAI
 import requests
 import uuid
 
-
 username = 'sky'
-# 세션 ID 없으면 생성
-if "session_id" not in st.session_state:
-    st.session_state["session_id"] = str(uuid.uuid4())
     
 load_dotenv()
 
@@ -49,32 +45,60 @@ st.markdown("""
             text-align: left;
             align-self: flex-start;
         }
+        /* 사이드바 버튼 스타일 */
+        section[data-testid="stSidebar"] button {
+            background-color: #f0f0f5;
+            color: #333;
+            border: none;
+            border-radius: 6px;
+            padding: 0.6em 1em;
+            font-weight: 500;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        /* 마우스 오버 효과 */
+        section[data-testid="stSidebar"] button:hover {
+            background-color: #e4e4ec;
+            color: #000;
+            cursor: pointer;
+        }
     </style>
 """, unsafe_allow_html=True)
 
-# 👤 접속자 이름 우측 상단 표시
-st.markdown(
-    f"""
-    <div style='text-align: right; font-size: 20px; margin-bottom: -20px; color: gray;'>
-        접속자 : <b>{username}</b>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+## loading
+if "initializing" not in st.session_state:
+    st.session_state["initializing"] = True
 
-# 🎯 세션 상태 초기화
-if "chat_history" not in st.session_state:
-    st.session_state["chat_history"] = []
-if "step" not in st.session_state:
-    st.session_state["step"] = -1  # -1: 논문 분야 선택, 0: 질문 입력, 1: 논문 추천, 2: 논문 선택
-if "first_question" not in st.session_state:
-    st.session_state["first_question"] = True  # 첫 번째 질문인지 여부
-if "selected_field" not in st.session_state:
-    st.session_state["selected_field"] = None
-if "papers" not in st.session_state:
-    st.session_state["papers"] = []
-if "selected_paper" not in st.session_state:
-    st.session_state["selected_paper"] = None
+if st.session_state["initializing"]:
+    with st.spinner("로딩 중입니다..."):
+        # 초기화 로직 (예: 세션 상태 설정, 서버 요청 등)
+        if "chat_history" not in st.session_state:
+            st.session_state["chat_history"] = []
+        if "step" not in st.session_state:
+            st.session_state["step"] = -1
+        if "first_question" not in st.session_state:
+            st.session_state["first_question"] = True
+        if "selected_field" not in st.session_state:
+            st.session_state["selected_field"] = None
+        if "papers" not in st.session_state:
+            st.session_state["papers"] = []
+        if "selected_paper" not in st.session_state:
+            st.session_state["selected_paper"] = None
+        if "history_mode" not in st.session_state:
+            st.session_state["history_mode"] = False
+        if "selected_history_session" not in st.session_state:
+            st.session_state["selected_history_session"] = None
+
+        # 세션 목록도 처음 로딩
+        if "available_sessions" not in st.session_state:
+            response = requests.get(f"http://localhost:8000/ChatHistoryByUser/{username}")
+            session_data = response.json().get("sessions", {})
+            st.session_state["available_sessions"] = list(session_data.keys())
+            st.session_state["session_data_dict"] = session_data
+
+        # 이제 초기화 완료!
+        st.session_state["initializing"] = False
+        st.rerun()
 
 # 📌 채팅 메시지 출력 함수
 def display_chat():
@@ -86,10 +110,80 @@ def display_chat():
 # 🏁 챗봇 타이틀
 st.title("🤖 AI 논문 추천 챗봇")
 
-display_chat()
+# 기본 채팅 출력 (히스토리 모드 아닐 때만!)
+if not st.session_state.get("history_mode", False):
+    display_chat()
+
+# 🧾 사이드바
+with st.sidebar:
+    st.header(f"👤 Username : {username}")
+    st.header("📌 Menu")
+    # 🏠 처음으로 돌아가기 버튼
+    if st.button("🏠 Home"):
+        # 리다이렉트 스크립트 삽입
+        st.markdown("""
+            <meta http-equiv="refresh" content="0; url=http://localhost:8501">
+            <script>
+                window.location.href = "http://localhost:8501";
+            </script>
+        """, unsafe_allow_html=True)
+    if st.button("🧾 Contact Us"):
+        pass
+
+    st.header("💬 Library")
+
+    # 세션 버튼들
+    if st.session_state["available_sessions"]:
+        for session_id in st.session_state["available_sessions"]:
+            messages = st.session_state["session_data_dict"].get(session_id, [])
+            first_user_msg = next((m["message"] for m in messages if m["role"] == "user"), "💬 (내용 없음)")
+            preview = (first_user_msg[:17] + "...") if len(first_user_msg) > 17 else first_user_msg
+            label = f"💬 {preview}"
+
+            # 열을 나눠서 왼쪽은 세션 버튼, 오른쪽은 삭제 버튼
+            col1, col2 = st.columns([0.85, 0.15])
+            with col1:
+                if st.button(label, key=f"session_{session_id}"):
+                    st.session_state["history_mode"] = True
+                    st.session_state["selected_history_session"] = session_id
+                    st.rerun()
+
+            with col2:
+                if st.button("❌", key=f"delete_{session_id}"):
+                    # 삭제 API 요청
+                    delete_url = f"http://localhost:8000/DeleteChatSession"
+                    response = requests.delete(delete_url, params={"username": username, "session_id": session_id})
+                    if response.status_code == 200:
+                        # 상태에서 해당 세션 제거
+                        st.session_state["available_sessions"].remove(session_id)
+                        st.session_state["session_data_dict"].pop(session_id, None)
+                        st.success(f"세션 {session_id} 삭제됨")
+                        st.rerun()
+                    else:
+                        st.error("세션 삭제 실패")
+
+# 📜 선택된 세션의 히스토리 표시
+if st.session_state.get("history_mode", False) and st.session_state.get("selected_history_session"):
+    session_id = st.session_state["selected_history_session"]
+    chat_history = requests.get(
+        "http://localhost:8000/GetChatHistoryBySession",
+        params={"username": username, "session_id": session_id}
+    ).json()
+
+    # st.subheader(f"📝 세션 {session_id}의 채팅 히스토리")
+    st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+
+    for chat in chat_history:
+        role = chat["role"]
+        message = chat["message"]
+        css_class = "user" if role == "user" else "bot"
+        st.markdown(f'<div class="chat-message {css_class}">{message}</div>', unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # 📌 -1. 논문 분야 선택 단계
-if st.session_state["step"] == -1:
+if st.session_state["step"] == -1 and not st.session_state.get("history_mode", False):
+    st.session_state["session_id"] = str(uuid.uuid4())
     st.subheader("📚 관심 있는 논문 분야를 선택하세요!")
 
     fields = [

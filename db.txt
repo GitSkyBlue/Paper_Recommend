@@ -1,8 +1,4 @@
-create table user_input
-(
-    input_text VARCHAR(200) NOT NULL,
-    phone_number VARCHAR(15) NOT NULL
-);
+use paper;
 
 CREATE TABLE summary_store (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -19,6 +15,7 @@ drop table chat_history;
 
 CREATE TABLE chat_history (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50),
     session_id VARCHAR(100),  -- 고유 세션 식별자 (UUID 추천)
     role ENUM('user', 'bot'),
     message TEXT,
