@@ -7,7 +7,7 @@ from openai import OpenAI
 import requests
 import uuid
 
-username = 'sky'
+username = 'test'
     
 load_dotenv()
 
@@ -24,14 +24,14 @@ st.set_page_config(page_title="AI 논문 추천 챗봇", page_icon="📚", layou
 st.markdown("""
     <style>
         .chat-container {
-            max-width: 700px;
+            max-width: 1200px;
             margin: auto;
         }
         .chat-message {
             padding: 12px;
             border-radius: 10px;
             margin: 5px 0;
-            max-width: 80%;
+            max-width: 100%;
         }
         .user {
             background-color: #007AFF;
@@ -62,6 +62,23 @@ st.markdown("""
             color: #000;
             cursor: pointer;
         }
+
+        /* 버튼 위치 조정하고 위에 띄우기 */
+        [data-testid="stSidebarCollapseButton"] {
+            opacity: 1 !important;
+            visibility: visible !important;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+        }
+        button[data-testid="stBaseButton-headerNoPadding"] {
+            padding: 0 !important;
+        }
+        .button-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem 0;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -70,35 +87,59 @@ if "initializing" not in st.session_state:
     st.session_state["initializing"] = True
 
 if st.session_state["initializing"]:
-    with st.spinner("로딩 중입니다..."):
-        # 초기화 로직 (예: 세션 상태 설정, 서버 요청 등)
-        if "chat_history" not in st.session_state:
-            st.session_state["chat_history"] = []
-        if "step" not in st.session_state:
-            st.session_state["step"] = -1
-        if "first_question" not in st.session_state:
-            st.session_state["first_question"] = True
-        if "selected_field" not in st.session_state:
-            st.session_state["selected_field"] = None
-        if "papers" not in st.session_state:
-            st.session_state["papers"] = []
-        if "selected_paper" not in st.session_state:
-            st.session_state["selected_paper"] = None
-        if "history_mode" not in st.session_state:
-            st.session_state["history_mode"] = False
-        if "selected_history_session" not in st.session_state:
-            st.session_state["selected_history_session"] = None
+    # 전체 화면용 로딩 메시지 출력
+    st.markdown("""
+        <div style="position: fixed;
+                    top: 0; left: 0; bottom: 0; right: 0;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    background-color: rgba(255, 255, 255, 0.85);
+                    z-index: 9999;">
+            <div style="text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold;">🔄 로딩 중입니다...</div>
+                <div style="margin-top: 10px;">잠시만 기다려주세요!</div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
 
-        # 세션 목록도 처음 로딩
-        if "available_sessions" not in st.session_state:
-            response = requests.get(f"http://localhost:8000/ChatHistoryByUser/{username}")
-            session_data = response.json().get("sessions", {})
-            st.session_state["available_sessions"] = list(session_data.keys())
-            st.session_state["session_data_dict"] = session_data
+    # 초기화 로직 수행
+    # (여기에 기존 초기화 코드 그대로 들어감)
+    with st.empty():  # placeholder로 강제 렌더링 유지
+        # 딜레이 추가 시에도 유용
+        import time
+        time.sleep(0.5)
 
-        # 이제 초기화 완료!
-        st.session_state["initializing"] = False
-        st.rerun()
+    # ... 초기화 로직 이어서
+    if "chat_history" not in st.session_state:
+        st.session_state["chat_history"] = []
+    if "step" not in st.session_state:
+        st.session_state["step"] = -1
+    if "first_question" not in st.session_state:
+        st.session_state["first_question"] = True
+    if "selected_field" not in st.session_state:
+        st.session_state["selected_field"] = None
+    if "papers" not in st.session_state:
+        st.session_state["papers"] = []
+    if "selected_paper" not in st.session_state:
+        st.session_state["selected_paper"] = None
+    if "history_mode" not in st.session_state:
+        st.session_state["history_mode"] = False
+    if "selected_history_session" not in st.session_state:
+        st.session_state["selected_history_session"] = None
+    if 'SearchQuery' not in st.session_state:
+        st.session_state["SearchQuery"] = None
+
+    # 세션 목록도 처음 로딩
+    if "available_sessions" not in st.session_state:
+        response = requests.get(f"http://localhost:8000/ChatHistoryByUser/{username}")
+        session_data = response.json().get("sessions", {})
+        st.session_state["available_sessions"] = list(session_data.keys())
+        st.session_state["session_data_dict"] = session_data
+
+    # 초기화 완료 후 재렌더링
+    st.session_state["initializing"] = False
+    st.rerun()
 
 # 📌 채팅 메시지 출력 함수
 def display_chat():
@@ -119,25 +160,36 @@ with st.sidebar:
     st.header(f"👤 Username : {username}")
     st.header("📌 Menu")
     # 🏠 처음으로 돌아가기 버튼
-    if st.button("🏠 Home"):
-        # 리다이렉트 스크립트 삽입
-        st.markdown("""
-            <meta http-equiv="refresh" content="0; url=http://localhost:8501">
-            <script>
-                window.location.href = "http://localhost:8501";
-            </script>
-        """, unsafe_allow_html=True)
+    if st.button("💬 New Chat"):
+        # 상태 초기화
+        st.session_state["history_mode"] = False
+        st.session_state["chat_history"] = []
+        st.session_state["step"] = -1
+        st.session_state["first_question"] = True
+        st.session_state["selected_field"] = None
+        st.session_state["papers"] = []
+        st.session_state["selected_paper"] = None
+        st.session_state["selected_history_session"] = None
+        st.session_state["title"] = None
+        st.session_state["user_request"] = None
+        st.session_state["json_Data"] = None
+        response = requests.get(f"http://localhost:8000/ChatHistoryByUser/{username}")
+        session_data = response.json().get("sessions", {})
+        st.session_state["available_sessions"] = list(session_data.keys())
+        st.session_state["session_data_dict"] = session_data
+        st.rerun()
     if st.button("🧾 Contact Us"):
         pass
 
-    st.header("💬 Library")
+    st.header("📚 Library")
 
     # 세션 버튼들
     if st.session_state["available_sessions"]:
         for session_id in st.session_state["available_sessions"]:
             messages = st.session_state["session_data_dict"].get(session_id, [])
-            first_user_msg = next((m["message"] for m in messages if m["role"] == "user"), "💬 (내용 없음)")
-            preview = (first_user_msg[:17] + "...") if len(first_user_msg) > 17 else first_user_msg
+            last_user_query = next((m["search_query"] for m in reversed(messages)), "💬 [내용 없음]")
+
+            preview = (last_user_query[:17] + "...") if len(last_user_query) > 17 else last_user_query
             label = f"💬 {preview}"
 
             # 열을 나눠서 왼쪽은 세션 버튼, 오른쪽은 삭제 버튼
@@ -196,7 +248,7 @@ if st.session_state["step"] == -1 and not st.session_state.get("history_mode", F
     if st.button("선택 완료"):
         st.session_state["selected_field"] = selected_field
         message = f"✅ 선택한 분야 : {selected_field}"
-        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "bot", "message": message})
+        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "bot", "message": message, 'search_query': 'Search Query가 없음!'})
         st.session_state["chat_history"].append(("bot", message))
         st.session_state["step"] = 0  # 질문 입력 단계로 이동
         st.rerun()
@@ -209,7 +261,6 @@ if st.session_state["step"] == 0:
     user_input = st.chat_input("질문을 입력하세요.")  # 입력창 길이 통일
 
     if user_input: #이게 쿼리
-        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "user", "message": user_input})
         st.session_state["chat_history"].append(("user", user_input))
         st.session_state["step"] = 1  # 다음 단계로 진행
         st.session_state["first_question"] = False  # 첫 질문 이후로는 문구 숨김
@@ -225,6 +276,7 @@ if st.session_state["step"] == 0:
         st.session_state['SearchQuery'] = search_Query
         st.session_state['user_request'] = user_Request
         st.session_state["json_Data"] = json_Data
+        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "user", "message": user_input, 'search_query': st.session_state['SearchQuery']})
         st.rerun()
 
 # 📌 1. 논문 추천 단계
@@ -269,7 +321,7 @@ if st.session_state["step"] == 1:
     st.session_state["papers"] = selected_paper_infos
 
     message = f"다음 논문들을 추천드립니다.\n\n{paper_list}\n\n🔽 분석할 논문을 선택해주세요!"
-    requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "bot", "message": message})
+    requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "bot", "message": message, 'search_query': st.session_state['SearchQuery']})
     st.session_state["chat_history"].append(("bot", message))
     st.session_state["step"] = 2  # 논문 선택 단계로 이동
     st.rerun()
@@ -291,18 +343,15 @@ if st.session_state["step"] == 3:
     selected_paper = st.session_state["selected_paper"]
     user_Request = st.session_state['user_request']
     
-    answer = requests.post("http://localhost:8000/CheckExist", json={'title': selected_paper['title']}).json()
-    if answer == 0:
-        answer = requests.post("http://localhost:8000/Summarize", json={'user_request': user_Request, 'selected_paper': selected_paper['title']}).json()
+    answer = requests.post("http://localhost:8000/Summarize", json={'user_request': user_Request, 'selected_paper': selected_paper['title']}).json()
     
     if answer:
         message = f"📄 선택한 논문: {answer['title']}"
-        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "user", "message": message})
+        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "user", "message": message, 'search_query': st.session_state['SearchQuery']})
         st.session_state["chat_history"].append(("user", message))
 
         message = f"📝 논문 주요 내용 요약: {answer['summary']}"
-        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "bot", "message": message})
-        requests.post("http://localhost:8000/SaveSummary", json={"title": answer['title'], "summary": answer['summary']})
+        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "bot", "message": message, 'search_query': st.session_state['SearchQuery']})
         st.session_state["chat_history"].append(("bot", message))
 
         st.session_state['title'] = answer['title']
@@ -315,14 +364,14 @@ if st.session_state['step'] == 4:
     user_more_input = st.chat_input("추가 질문을 입력하세요.")
 
     if user_more_input:
-        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "user", "message": user_more_input})
+        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "user", "message": user_more_input, 'search_query': st.session_state['SearchQuery']})
         st.session_state["chat_history"].append(("user", user_more_input))
         
         title = st.session_state['title']
         
         additional_summary = requests.post("http://localhost:8000/AdditionalAnalysis", json={'user_more_input': user_more_input, 'title': title}).json()
         
-        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "bot", "message": f"📝 {additional_summary}"})
+        requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "bot", "message": f"📝 {additional_summary}", 'search_query': st.session_state['SearchQuery']})
         st.session_state["chat_history"].append(("bot", f"📝 {additional_summary}"))
         st.session_state["step"] = 4  # Step 4 유지 (추가 질문 대기)
         st.rerun()

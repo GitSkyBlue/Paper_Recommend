@@ -137,30 +137,15 @@ def summarize_papers(request: SummarizeRequest):
     doc = fitz.open(file_path)
     text = "\n".join([page.get_text("text") for page in doc])
 
-    # 시스템 프롬프트 구성
-    if "summary" in request.user_request.lower() or "summariz" in request.user_request.lower():
-        system_prompt = '''
-        You are an AI research assistant that summarizes academic papers into well-structured Korean summaries.
+    system_prompt = f'''
+    You are an AI research assistant that processes academic papers based on specific user requests.  
+    Your primary task is to analyze the given research paper and provide an accurate response according to the user's request.  
 
-        📌 Instructions:
-        1. Consider everything between "Introduction" and "Conclusion" as the main content.
-        2. Summarize the **Introduction** - briefly state the background and the research question.
-        3. Summarize the **Main Content** - focus on methodology, experiments, and key findings in a concise but informative way.
-        4. Summarize the **Conclusion** - highlight the achievements and possible future directions.
-        5. Format the response with clear headings for each section.
-        6. Translate the final response into fluent Korean.
-        '''
-    else:
-        system_prompt = f'''
-        You are an AI research assistant that processes academic papers based on specific user requests.  
-        Your primary task is to analyze the given research paper and provide an accurate response according to the user's request.  
-        The final response should be translated into Korean before being presented to the user.  
-
-        📌 **Instructions:**  
-        1️. **Understand the user's request `{request.user_request}`.**  
-        2️. **Extract and provide ONLY the requested information.**  
-        3️. **Translate the final response into Korean.**  
-        '''
+    📌 **Instructions:**  
+    1️. **Understand the user's request `{request.user_request}`.**  
+    2️. **Extract and provide ONLY the requested information.**  
+    3. 반드시 한국어로 답변하세요.
+    '''
 
     # GPT 호출
     response = client.chat.completions.create(
@@ -170,7 +155,7 @@ def summarize_papers(request: SummarizeRequest):
         ],
         model='gpt-4o-mini',
         max_tokens=1024,
-        temperature=0.6,
+        temperature=0.4,
     )
 
     return {"title": request.selected_paper, "summary": response.choices[0].message.content}

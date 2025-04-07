@@ -23,7 +23,7 @@ def load_models():
     print("🔧 모델 로딩 중...")
     embeddings_model = HuggingFaceEmbeddings(model_name='sentence-transformers/msmarco-distilbert-dot-v5')
     reranker_model = HuggingFaceCrossEncoder(model_name='BAAI/bge-reranker-v2-m3')
-    compressor = CrossEncoderReranker(model=reranker_model, top_n=5)
+    compressor = CrossEncoderReranker(model=reranker_model, top_n=10)
     print("✅ 모델 로딩 완료!")
 
 # ✅ POST 방식 API
@@ -40,7 +40,7 @@ def check_similarity(request: SimilarityRequest):
         ]
 
         # ✅ FAISS 인덱스 생성
-        retriever = FAISS.from_documents(documents, embeddings_model).as_retriever(search_kwargs={'k': 10})
+        retriever = FAISS.from_documents(documents, embeddings_model).as_retriever(search_kwargs={'k': 20})
 
         # ✅ 압축 검색기 (Reranker 적용)
         compression_retriever = ContextualCompressionRetriever(base_compressor=compressor, base_retriever=retriever)
