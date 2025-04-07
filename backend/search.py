@@ -40,6 +40,7 @@ def get_query_and_request(request: QueryInput):
     # 파싱
     search_Query = result.split('Search Query**: ')[-1].split('\n')[0].strip().replace('"', '')
     user_Request = result.split('User Request**: ')[-1].strip()
+    print('User Request :', user_Request)
 
     return search_Query, user_Request
 
@@ -48,7 +49,7 @@ def find_by_search_query(request: PaperSearchRequest):
     search_query = request.search_query
     selected_field = request.selected_field
 
-    ID_URL = f"https://api.semanticscholar.org/graph/v1/paper/search?query={search_query}&fields=url,abstract,fieldsOfStudy,openAccessPdf&limit=50"
+    ID_URL = f"https://api.semanticscholar.org/graph/v1/paper/search?query={search_query}&fields=url,abstract,fieldsOfStudy,openAccessPdf&limit=100"
     headers = {"x-api-key": SEMANTIC_API_KEY}
     
     response = requests.get(ID_URL, headers=headers)
@@ -56,19 +57,22 @@ def find_by_search_query(request: PaperSearchRequest):
 
     end = []
     papers = data.get('data', [])
-
+    print('paper'*5, len(papers))
     for paper in papers:
         category = paper.get('fieldsOfStudy')
         open_access_pdf = paper.get('openAccessPdf') or {}
         pdf_url = open_access_pdf.get('url')
-
+        print(category)
+        print(open_access_pdf)
+        print()
         if pdf_url:
             if isinstance(category, list):
                 if selected_field in category:
                     end.append(paper)
-            elif category == selected_field:
+            elif category == selected_field or category == None:
                 end.append(paper)
 
+    print('end'*5, len(end))
     return end
 
 if __name__ == '__main__':

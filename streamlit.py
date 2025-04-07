@@ -270,9 +270,9 @@ if st.session_state["step"] == 0:
         selected_field = st.session_state.get("selected_field")
 
         search_Query, user_Request = requests.post("http://localhost:8000/QueryAndRequest", json={"query": user_input}).json()
-        
+        print(search_Query)
         json_Data = requests.post("http://localhost:8000/FindBySearchQuery", json={"search_query": search_Query, "selected_field": selected_field}).json()
-        
+        print('json_Data' * 5, len(json_Data))
         st.session_state['SearchQuery'] = search_Query
         st.session_state['user_request'] = user_Request
         st.session_state["json_Data"] = json_Data
