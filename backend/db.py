@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 import pymysql.cursors
-from .models import ChatLog, SummaryLog, CheckRequest
+from .models import ChatLog, SummaryLog
 import pymysql
 from fastapi.responses import JSONResponse
 from datetime import datetime
@@ -21,8 +21,8 @@ def save_chat(log: ChatLog):
     conn = connect_to_mysql()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO chat_history (session_id, username, role, message) VALUES (%s, %s, %s, %s)",
-        (log.session_id, log.username, log.role, log.message)
+        "INSERT INTO chat_history (session_id, username, role, message, search_query) VALUES (%s, %s, %s, %s, %s)",
+        (log.session_id, log.username, log.role, log.message, log.search_query)
     )
     conn.commit()
     cursor.close()
@@ -42,37 +42,26 @@ def save_summary(request: SummaryLog):
     conn.close()
     return {'status': 'success'}
 
-@router.post("/CheckExist")
-def check_exist(request: CheckRequest):
-    conn = connect_to_mysql()
-    cursor = conn.cursor()
-    title = request.title
-    sql = f'SELECT message FROM summary_store WHERE title="{title}";'
-    cursor.execute(sql)
-
-    results = cursor.fetchone()  # 결과 모두 가져오기
-    
-    cursor.close()
-    conn.close()
-
-    if results == None:
-        return 0
-    
-    return {"title": request.title, "summary": results[0]}
-
 @router.get("/ChatHistoryByUser/{username}")
 def get_chat_history_by_user(username: str):
     conn = connect_to_mysql()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
-    
-    # 유저 이름으로 필터링 후 session_id로 정렬, 그 안에서는 timestamp로 정렬
+
+    # 세션별로 최근 메시지 시간 가져오기
     query = """
-        SELECT session_id, role, message, timestamp
-        FROM chat_history
-        WHERE username = %s
-        ORDER BY session_id, timestamp;
+        SELECT ch.session_id, ch.role, ch.message, ch.search_query, ch.timestamp
+        FROM chat_history ch
+        INNER JOIN (
+            SELECT session_id, MAX(timestamp) AS latest_time
+            FROM chat_history
+            WHERE username = %s
+            GROUP BY session_id
+        ) latest
+        ON ch.session_id = latest.session_id
+        WHERE ch.username = %s
+        ORDER BY latest.latest_time DESC, ch.timestamp ASC;
     """
-    cursor.execute(query, (username,))
+    cursor.execute(query, (username, username))
     results = cursor.fetchall()
 
     conn.close()
@@ -86,7 +75,8 @@ def get_chat_history_by_user(username: str):
         history[session_id].append({
             "role": row["role"],
             "message": row["message"],
-            "timestamp": row["timestamp"].strftime("%Y-%m-%d %H:%M:%S")
+            "timestamp": row["timestamp"].strftime("%Y-%m-%d %H:%M:%S"),
+            'search_query': row['search_query']
         })
 
     return {"username": username, "sessions": history}
