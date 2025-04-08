@@ -46,7 +46,7 @@ def check_similarity(request: SimilarityRequest):
         compression_retriever = ContextualCompressionRetriever(base_compressor=compressor, base_retriever=retriever)
 
         compressed_docs = compression_retriever.invoke(request.search_query)
-        # print(compressed_docs)
+        
         return compressed_docs
 
     except Exception as e:

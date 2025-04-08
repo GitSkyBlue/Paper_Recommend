@@ -43,27 +43,6 @@ def find_id_and_url(request: FindIDAndURLRequest):
                 ])
                 break
 
-    # for i, (id, title, pdf, abstract) in enumerate(paper_info):
-    #     response = client.chat.completions.create(
-    #         messages=[
-    #             {'role': 'system', 'content': '''
-    #                 You are an AI assistant that summarizes and translates research abstracts concisely and accurately.  
-    #                 Follow these steps:  
-    #                 1. Summarize the abstract in **three sentences**:  
-    #                 - The research problem and significance.  
-    #                 - The main approach/methodology.  
-    #                 - The key findings and implications.  
-    #                 2. Translate the summary into Korean. 
-    #                 3. From your answer, only give translated answer. Do not give English summary of the abstract.
-    #             '''},
-    #             {'role': 'user', 'content': abstract}
-    #         ],
-    #         model='gpt-4o-mini',
-    #         max_tokens=1024,
-    #         temperature=0.6,
-    #     )
-    #     paper_info[i].append(response.choices[0].message.content)
-
     return paper_info
 
 @router.post("/DownloadPDF")
@@ -176,6 +155,7 @@ def summarize_papers(request: SummarizeRequest):
     6. Summarize the **Conclusion** - highlight the achievements and possible future directions.
     7. Format the response with clear headings for each section.
     8. 반드시 한국어로 답변하세요.
+    9. 번역되기 전 원문을 절대로 답변하지마세요.
     '''
 
     # GPT 호출
@@ -201,8 +181,8 @@ def additional_analysis(request: AdditionalAnalysisRequest):
                 {'role': 'system', 'content': f"""
                 You are an AI research assistant that processes academic papers based on specific user requests.  
                 Your primary task is to analyze the given research paper and provide an accurate response according to the user's request.  
-                The final response should be translated into Korean before being presented to the user.
                 Based on {text}, generate best answer about user's input.
+                반드시 한국어로 답변하세요.
                 """},
                 {'role': 'user', 'content': request.user_more_input}
             ],

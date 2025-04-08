@@ -104,8 +104,6 @@ if st.session_state["initializing"]:
         </div>
     """, unsafe_allow_html=True)
 
-    # 초기화 로직 수행
-    # (여기에 기존 초기화 코드 그대로 들어감)
     with st.empty():  # placeholder로 강제 렌더링 유지
         # 딜레이 추가 시에도 유용
         import time
@@ -210,6 +208,8 @@ with st.sidebar:
                         # 상태에서 해당 세션 제거
                         st.session_state["available_sessions"].remove(session_id)
                         st.session_state["session_data_dict"].pop(session_id, None)
+                        st.session_state["history_mode"] = False
+                        st.session_state["step"] = -1
                         st.rerun()
                     else:
                         st.error("세션 삭제 실패")
@@ -270,9 +270,9 @@ if st.session_state["step"] == 0:
         selected_field = st.session_state.get("selected_field")
 
         search_Query, user_Request = requests.post("http://localhost:8000/QueryAndRequest", json={"query": user_input}).json()
-        print(search_Query)
+        print(search_Query, user_Request)
         json_Data = requests.post("http://localhost:8000/FindBySearchQuery", json={"search_query": search_Query, "selected_field": selected_field}).json()
-        print('json_Data' * 5, len(json_Data))
+
         st.session_state['SearchQuery'] = search_Query
         st.session_state['user_request'] = user_Request
         st.session_state["json_Data"] = json_Data
@@ -302,19 +302,22 @@ if st.session_state["step"] == 1:
 
     #제목+초록 가져오기
     paper_infos = requests.post("http://localhost:8000/FindIDAndURL", json={"sim_list": [{"page_content": doc["page_content"]} for doc in sim_list], "json_data": json_Data}).json()
-    
+
     # 변환
     formatted_papers = [
         {
             "paper_id": item[0],
             "title": item[1],
             "pdf_url": item[2],
-            "abstract": item[3]
+            "abstract": 'Abstract가 제공되지 않습니다!' if item[3] == None else item[3]
         }
         for item in paper_infos
     ]
     # 순서 무작위 섞기
     random.shuffle(formatted_papers)
+    print('formatted_papers')
+    for i in formatted_papers:
+        print(i)
 
     selected_paper_infos = requests.post("http://localhost:8000/DownloadPDF", json={'paper_infos': formatted_papers}).json()
     selected_summary = requests.post("http://localhost:8000/SummarizeAbstract", json={'sum_list': selected_paper_infos}).json()
@@ -351,7 +354,7 @@ if st.session_state["step"] == 3:
         requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "user", "message": message, 'search_query': st.session_state['SearchQuery']})
         st.session_state["chat_history"].append(("user", message))
 
-        message = f"📝 논문 주요 내용 요약: {answer['summary']}"
+        message = f"📝 논문 주요 내용 요약:\n\n{answer['summary']}"
         requests.post("http://localhost:8000/SaveChat", json={"session_id": st.session_state["session_id"], "username": username, "role": "bot", "message": message, 'search_query': st.session_state['SearchQuery']})
         st.session_state["chat_history"].append(("bot", message))
 

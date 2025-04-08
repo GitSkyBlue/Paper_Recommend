@@ -48,7 +48,9 @@
 ┃ ┣ 📜 similarity.py   
 ┃ ┣ 📜 summary.py   
 ┣ 📂 frontend   
-┃ ┣ 📜 streamlit.py   
+┃ ┣ 📜 app.py   
+┃ 📜 .env   
+┃ 📜 db.sql   
 ┃ 📜 requirements.txt   
 ┗ 📜 README.md   
 
@@ -63,10 +65,15 @@ $ pip install -r requirements.txt
 
 ### Frontend   
 ```
-$ streamlit run frontend.streamlit.py
+$ streamlit run frontend/app.py
 ```
 
 ### Backend   
 ```
 $ uvicorn backend.main:app --reload
+```
+
+### Database
+```
+$ db.sql
 ```
