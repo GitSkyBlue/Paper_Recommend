@@ -29,7 +29,6 @@ def load_models():
 # ✅ POST 방식 API
 @router.post("/CheckSimilarity")
 def check_similarity(request: SimilarityRequest):
-    print("LEN" * 10, len(request.json_data))
     try:
         # ✅ Document 변환
         documents = [
