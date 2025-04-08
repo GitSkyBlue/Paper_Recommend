@@ -32,7 +32,6 @@ class PaperInfo(BaseModel):
     title: str
     pdf_url: str
     abstract: str
-    summary: str
 
 class DownloadPDFRequest(BaseModel):
     paper_infos: List[PaperInfo]
@@ -40,6 +39,9 @@ class DownloadPDFRequest(BaseModel):
 class SummarizeRequest(BaseModel):
     user_request: str
     selected_paper: str
+
+class SummarizeAbstractRequest(BaseModel):
+    sum_list: List[PaperInfo]
 
 class AdditionalAnalysisRequest(BaseModel):
     user_more_input: str

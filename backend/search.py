@@ -48,7 +48,7 @@ def find_by_search_query(request: PaperSearchRequest):
     search_query = request.search_query
     selected_field = request.selected_field
 
-    ID_URL = f"https://api.semanticscholar.org/graph/v1/paper/search?query={search_query}&fields=url,abstract,fieldsOfStudy,openAccessPdf&limit=50"
+    ID_URL = f"https://api.semanticscholar.org/graph/v1/paper/search?query={search_query}&fields=url,abstract,fieldsOfStudy,openAccessPdf&limit=100"
     headers = {"x-api-key": SEMANTIC_API_KEY}
     
     response = requests.get(ID_URL, headers=headers)
@@ -56,7 +56,6 @@ def find_by_search_query(request: PaperSearchRequest):
 
     end = []
     papers = data.get('data', [])
-
     for paper in papers:
         category = paper.get('fieldsOfStudy')
         open_access_pdf = paper.get('openAccessPdf') or {}
@@ -66,7 +65,7 @@ def find_by_search_query(request: PaperSearchRequest):
             if isinstance(category, list):
                 if selected_field in category:
                     end.append(paper)
-            elif category == selected_field:
+            elif category == selected_field or category == None:
                 end.append(paper)
 
     return end

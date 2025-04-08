@@ -40,7 +40,7 @@ def check_similarity(request: SimilarityRequest):
         ]
 
         # ✅ FAISS 인덱스 생성
-        retriever = FAISS.from_documents(documents, embeddings_model).as_retriever(search_kwargs={'k': 20})
+        retriever = FAISS.from_documents(documents, embeddings_model).as_retriever(search_kwargs={'k': 30})
 
         # ✅ 압축 검색기 (Reranker 적용)
         compression_retriever = ContextualCompressionRetriever(base_compressor=compressor, base_retriever=retriever)

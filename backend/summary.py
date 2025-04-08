@@ -1,6 +1,6 @@
 from openai import OpenAI
 import certifi
-from .models import FindIDAndURLRequest, DownloadPDFRequest, AdditionalAnalysisRequest, SummarizeRequest
+from .models import FindIDAndURLRequest, DownloadPDFRequest, AdditionalAnalysisRequest, SummarizeRequest, SummarizeAbstractRequest
 from fastapi import APIRouter
 import os, re, shutil, glob, time
 from selenium import webdriver
@@ -43,26 +43,26 @@ def find_id_and_url(request: FindIDAndURLRequest):
                 ])
                 break
 
-    for i, (id, title, pdf, abstract) in enumerate(paper_info):
-        response = client.chat.completions.create(
-            messages=[
-                {'role': 'system', 'content': '''
-                    You are an AI assistant that summarizes and translates research abstracts concisely and accurately.  
-                    Follow these steps:  
-                    1. Summarize the abstract in **three sentences**:  
-                    - The research problem and significance.  
-                    - The main approach/methodology.  
-                    - The key findings and implications.  
-                    2. Translate the summary into Korean. 
-                    3. From your answer, only give translated answer. Do not give English summary of the abstract.
-                '''},
-                {'role': 'user', 'content': abstract}
-            ],
-            model='gpt-4o-mini',
-            max_tokens=1024,
-            temperature=0.6,
-        )
-        paper_info[i].append(response.choices[0].message.content)
+    # for i, (id, title, pdf, abstract) in enumerate(paper_info):
+    #     response = client.chat.completions.create(
+    #         messages=[
+    #             {'role': 'system', 'content': '''
+    #                 You are an AI assistant that summarizes and translates research abstracts concisely and accurately.  
+    #                 Follow these steps:  
+    #                 1. Summarize the abstract in **three sentences**:  
+    #                 - The research problem and significance.  
+    #                 - The main approach/methodology.  
+    #                 - The key findings and implications.  
+    #                 2. Translate the summary into Korean. 
+    #                 3. From your answer, only give translated answer. Do not give English summary of the abstract.
+    #             '''},
+    #             {'role': 'user', 'content': abstract}
+    #         ],
+    #         model='gpt-4o-mini',
+    #         max_tokens=1024,
+    #         temperature=0.6,
+    #     )
+    #     paper_info[i].append(response.choices[0].message.content)
 
     return paper_info
 
@@ -124,6 +124,32 @@ def download_pdf(request: DownloadPDFRequest):
     print(f"✅ PDF 다운로드 완료: {download_dir}")
     return [paper.dict() for paper in successful_papers]
 
+@router.post("/SummarizeAbstract")
+def summarize_abstract_papers(request: SummarizeAbstractRequest):
+    results = []
+    for i, paper in enumerate(request.sum_list):
+        response = client.chat.completions.create(
+            messages=[
+                {'role': 'system', 'content': '''
+                    You are an AI assistant that summarizes and translates research abstracts concisely and accurately.  
+                    Follow these steps:  
+                    1. Summarize the abstract in **three sentences**:  
+                    - The research problem and significance.  
+                    - The main approach/methodology.  
+                    - The key findings and implications.  
+                    2. Translate the summary into Korean. 
+                    3. From your answer, only give translated answer. Do not give English summary of the abstract.
+                '''},
+                {'role': 'user', 'content': paper.abstract}
+            ],
+            model='gpt-4o-mini',
+            max_tokens=1024,
+            temperature=0.6,
+        )
+        results.append({'title': paper.title, 'abstract': response.choices[0].message.content})
+
+    return results
+
 @router.post("/Summarize")
 def summarize_papers(request: SummarizeRequest):
     path = 'downloads/'
@@ -144,7 +170,12 @@ def summarize_papers(request: SummarizeRequest):
     📌 **Instructions:**  
     1️. **Understand the user's request `{request.user_request}`.**  
     2️. **Extract and provide ONLY the requested information.**  
-    3. 반드시 한국어로 답변하세요.
+    3. Consider everything between "Introduction" and "Conclusion" as the main content.
+    4. Summarize the **Introduction** - briefly state the background and the research question.
+    5. Summarize the **Main Content** - focus on methodology, experiments, and key findings in a concise but informative way.
+    6. Summarize the **Conclusion** - highlight the achievements and possible future directions.
+    7. Format the response with clear headings for each section.
+    8. 반드시 한국어로 답변하세요.
     '''
 
     # GPT 호출
