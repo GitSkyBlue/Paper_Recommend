@@ -77,3 +77,17 @@ $ uvicorn backend.main:app --reload
 ```
 $ db.sql
 ```
+
+## 6. 실행 화면
+
+### 메인 화면
+![메인이미지](images/main.png)
+
+### User Input
+![메인이미지](images/input.png)
+
+### 유사도 측정을 통해 선택된 논문 화면
+![메인이미지](images/selected.png)
+
+### 선택한 논문 자세한 분석 화면
+![메인이미지](images/results.png)
