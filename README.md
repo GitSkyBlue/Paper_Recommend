@@ -78,7 +78,7 @@ $ uvicorn backend.main:app --reload
 $ db.sql
 ```
 
-## 6. 실행 화면
+## 📌 6. 실행 화면
 
 ### 메인 화면
 ![메인이미지](images/main.png)
