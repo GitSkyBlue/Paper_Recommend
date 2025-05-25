@@ -1,7 +1,7 @@
 CREATE TABLE chat_history (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50),
-    session_id VARCHAR(100),  -- 고유 세션 식별자 (UUID 추천)
+    session_id VARCHAR(100),
     role ENUM('user', 'bot'),
     message TEXT,
     search_query VARCHAR(100),
